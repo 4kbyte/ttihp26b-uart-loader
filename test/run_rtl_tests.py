@@ -45,6 +45,12 @@ def run(
 def main() -> None:
     """Run the complete focused RTL suite."""
     run("uart_tb", ["src/uart.v", "test/uart_tb.sv"])
+    run(
+        "uart_tb",
+        ["src/uart.v", "test/uart_tb.sv"],
+        {"CLOCK_HZ": 50_000_000, "BAUD": 115_200},
+        "uart_production_timing_tb",
+    )
     run("spi_sram_tb", ["src/spi_sram.v", "test/spi_sram_tb.sv"])
     run("uart_loader_tb", ["src/uart_loader.v", "test/uart_loader_tb.sv"])
     run(

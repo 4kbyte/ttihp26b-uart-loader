@@ -2,7 +2,11 @@
 `timescale 1ns / 1ps
 
 // Verify UART timing, framing, buffering, and reset behavior.
-module uart_tb;
+module uart_tb #(
+    parameter integer CLOCK_HZ = 100,
+    parameter integer BAUD = 10
+);
+  localparam integer CLKS_PER_BIT = (CLOCK_HZ + (BAUD / 2)) / BAUD;
   reg clk = 0;
   always #5 clk = ~clk;
   reg rst_n;
@@ -22,8 +26,8 @@ module uart_tb;
   integer i;
 
   uart_rx #(
-      .CLOCK_HZ(100),
-      .BAUD(10)
+      .CLOCK_HZ(CLOCK_HZ),
+      .BAUD(BAUD)
   ) rx_dut (
       .clk(clk),
       .rst_n(rst_n),
@@ -36,8 +40,8 @@ module uart_tb;
       .overrun(overrun)
   );
   uart_tx #(
-      .CLOCK_HZ(100),
-      .BAUD(10)
+      .CLOCK_HZ(CLOCK_HZ),
+      .BAUD(BAUD)
   ) tx_dut (
       .clk(clk),
       .rst_n(rst_n),
@@ -68,7 +72,7 @@ module uart_tb;
     input value;
     begin
       rx = value;
-      repeat (10) tick();
+      repeat (CLKS_PER_BIT) tick();
     end
   endtask
   task send_uart;
@@ -106,9 +110,9 @@ module uart_tb;
     repeat (2) tick();
 
     rx = 0;
-    repeat (3) tick();
+    repeat (CLKS_PER_BIT / 4) tick();
     rx = 1;
-    repeat (12) tick();
+    repeat (CLKS_PER_BIT + 2) tick();
     check(!rx_valid && rx_level == 0 && !framing_error,
           "UART RX rejects a short false start");
 
@@ -157,13 +161,13 @@ module uart_tb;
     tick();
     tx_valid = 0;
     while (tx) tick();
-    repeat (5) tick();
+    repeat (CLKS_PER_BIT / 2) tick();
     check(tx == 0, "UART TX start bit");
     for (i = 0; i < 8; i = i + 1) begin
-      repeat (10) tick();
+      repeat (CLKS_PER_BIT) tick();
       check(tx == ((8'ha5 >> i) & 1'b1), "UART TX LSB-first data");
     end
-    repeat (10) tick();
+    repeat (CLKS_PER_BIT) tick();
     check(tx == 1, "UART TX stop bit");
     check(!tx_ready, "UART TX backpressures while active");
     reset_uart();
