@@ -7,7 +7,8 @@ WRITE transfer size is an RTL parameter reported by the CAPABILITIES command.
 
 ## How to test
 
-Run `make` in `test`. See [protocol.md](protocol.md) for the wire contract.
+Run `make` in `test`. See [protocol.md](protocol.md) for the wire contract and
+[physical.md](physical.md) for the 2x2 IHP implementation result.
 
 ## External hardware
 

@@ -46,3 +46,12 @@ faults, and verified by default.
 cd test
 make
 ```
+
+The pinned 2x2 IHP physical flow is:
+
+```powershell
+.\scripts\harden.ps1 -SourceRef b39b061837488728da787811d429c9fdd7830240
+.\scripts\precheck.ps1
+```
+
+See [docs/physical.md](docs/physical.md) for the reproducible signoff result.
