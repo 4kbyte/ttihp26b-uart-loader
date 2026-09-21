@@ -7,7 +7,9 @@
 `timescale 1ns / 1ps
 
 // Adapt byte memory requests to a 23LC512-compatible SPI SRAM.
-module spi_sram (
+module spi_sram #(
+    parameter integer SPI_HALF_PERIOD_CLKS = 4
+) (
     input  wire        clk,
     input  wire        rst_n,
     input  wire        req_valid,
@@ -43,18 +45,23 @@ module spi_sram (
   localparam [2:0] TRANSFER = 3'd3;
   localparam [2:0] RESPOND = 3'd4;
   localparam [2:0] FAILED = 3'd5;
+  localparam [2:0] COMPLETE = 3'd6;
+  localparam [2:0] RECOVER = 3'd7;
 
   localparam [1:0] TRANSFER_INIT_WRITE = 2'd0;
   localparam [1:0] TRANSFER_INIT_READ = 2'd1;
   localparam [1:0] TRANSFER_WRITE = 2'd2;
   localparam [1:0] TRANSFER_READ = 2'd3;
+  localparam integer SPI_DIVIDER_WIDTH =
+      SPI_HALF_PERIOD_CLKS <= 1 ? 1 : $clog2(SPI_HALF_PERIOD_CLKS);
 
   reg [2:0] state;
+  reg [2:0] resume_state;
   reg [31:0] tx_shift;
   reg [31:0] rx_shift;
   reg [5:0] total_bits;
   reg [5:0] sampled_bits;
-  reg [1:0] divider;
+  reg [SPI_DIVIDER_WIDTH-1:0] divider;
   reg [1:0] transfer_kind;
 
   assign req_ready = ((state == IDLE) || (state == FAILED)) && !rsp_valid;
@@ -81,7 +88,8 @@ module spi_sram (
   // Advance from mode-register write to readback.
   task automatic finish_mode_write;
     begin
-      state <= INIT_RDMR;
+      resume_state <= INIT_RDMR;
+      state <= RECOVER;
     end
   endtask
 
@@ -89,25 +97,25 @@ module spi_sram (
   task automatic finish_mode_read;
     begin
       if ((rx_shift[7:0] & SPI_MODE_MASK) == SPI_SEQUENTIAL_MODE) begin
-        memory_ready <= 1'b1;
         fault_class <= FAULT_NONE;
-        state <= IDLE;
+        resume_state <= IDLE;
       end
       else begin
         memory_ready <= 1'b0;
         fault_class <= FAULT_MODE;
-        state <= FAILED;
+        resume_state <= FAILED;
       end
+      state <= RECOVER;
     end
   endtask
 
   // Complete one memory transfer.
   task automatic finish_memory_transfer;
     begin
-      rsp_valid <= 1'b1;
       rsp_fault <= 1'b0;
       rsp_data <= transfer_kind == TRANSFER_READ ? rx_shift[7:0] : 8'h00;
-      state <= RESPOND;
+      resume_state <= RESPOND;
+      state <= RECOVER;
     end
   endtask
 
@@ -168,8 +176,10 @@ module spi_sram (
   task automatic lower_spi_clock;
     begin
       spi_sck <= 1'b0;
-      if (sampled_bits == total_bits)
-        finish_transfer();
+      if (sampled_bits == total_bits) begin
+        spi_mosi <= 1'b0;
+        state <= COMPLETE;
+      end
       else
         spi_mosi <= tx_shift[total_bits - sampled_bits - 1'b1];
     end
@@ -192,10 +202,21 @@ module spi_sram (
   // Advance one SPI transfer clock.
   task automatic advance_transfer;
     begin
-      if (divider != 2'd1)
+      if (divider != SPI_HALF_PERIOD_CLKS - 1)
         divider <= divider + 1'b1;
       else
         toggle_spi_clock();
+    end
+  endtask
+
+  // Preserve the minimum chip-select deselect interval before another transfer.
+  task automatic recover_transfer;
+    begin
+      if (resume_state == IDLE)
+        memory_ready <= 1'b1;
+      if (resume_state == RESPOND)
+        rsp_valid <= 1'b1;
+      state <= resume_state;
     end
   endtask
 
@@ -228,6 +249,7 @@ module spi_sram (
   always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       state                 <= INIT_WRMR;
+      resume_state          <= INIT_WRMR;
       tx_shift              <= 0;
       rx_shift              <= 0;
       total_bits            <= 0;
@@ -249,6 +271,8 @@ module spi_sram (
         INIT_RDMR: start_mode_read();
         IDLE: accept_request();
         TRANSFER: advance_transfer();
+        COMPLETE: finish_transfer();
+        RECOVER: recover_transfer();
         RESPOND: accept_response();
         FAILED: hold_failed();
         default: fail_internal();
@@ -257,6 +281,11 @@ module spi_sram (
   end
 
 `ifndef SYNTHESIS
+  initial begin
+    if (SPI_HALF_PERIOD_CLKS < 2)
+      $fatal(1, "SPI clock exceeds the 23LC512 20 MHz limit");
+  end
+
   reg held_rsp;
   reg [7:0] held_data;
   reg held_fault;

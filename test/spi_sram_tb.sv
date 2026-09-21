@@ -28,6 +28,8 @@ module spi_sram_tb;
   integer bit_count;
   integer clock_count;
   integer last_sck_edge;
+  time last_cs_release;
+  time last_sck_rise;
   integer i;
   reg [31:0] captured;
   reg [31:0] last_frame;
@@ -103,6 +105,8 @@ module spi_sram_tb;
 
   always @(negedge spi_cs_n) begin
     check(spi_sck == 0, "mode-0 clock low at CS assertion");
+    if (rst_n && last_cs_release != 0)
+      check($time - last_cs_release >= 25, "CS deselect time meets 25 ns minimum");
     bit_count = 0;
     last_sck_edge = -1;
     captured = 0;
@@ -113,18 +117,24 @@ module spi_sram_tb;
     cs_windows = cs_windows + 1;
   end
 
-  always @(posedge clk) clock_count = clock_count + 1;
+  always @(posedge clk) begin
+    clock_count = clock_count + 1;
+    if (clock_count > 100000)
+      $fatal(1, "SPI SRAM test timeout: state=%0d CS=%0b SCK=%0b bits=%0d",
+             dut.state, spi_cs_n, spi_sck, bit_count);
+  end
 
   always @(spi_sck) begin
     if (!spi_cs_n && rst_n) begin
       if (last_sck_edge >= 0)
-        check(clock_count - last_sck_edge >= 2, "SPI clock does not exceed 12.5 MHz");
+        check(clock_count - last_sck_edge >= 4, "SPI clock does not exceed 6.25 MHz");
       last_sck_edge = clock_count;
     end
   end
 
   always @(posedge spi_sck) begin
     if (!spi_cs_n) begin
+      last_sck_rise = $time;
       captured = {captured[30:0], spi_mosi};
       bit_count = bit_count + 1;
       rising_edges = rising_edges + 1;
@@ -149,13 +159,17 @@ module spi_sram_tb;
   end
 
   always @(posedge spi_cs_n) begin
-    if (bit_count != 0) begin
+    if (rst_n && bit_count != 0) begin
+      check($time - last_sck_rise >= 50, "CS hold time meets 50 ns minimum");
       last_frame = captured;
       if (command == 8'h01 && bit_count == 16)
         mode_register = captured[7:0];
       if (command == 8'h02 && bit_count == 32)
         sram[captured[23:8]] = captured[7:0];
     end
+    else if (bit_count != 0 && command == 8'h02 && bit_count == 32)
+      sram[captured[23:8]] = captured[7:0];
+    last_cs_release = $time;
   end
 
   initial begin
@@ -165,6 +179,8 @@ module spi_sram_tb;
     rising_edges = 0;
     clock_count = 0;
     last_sck_edge = -1;
+    last_cs_release = 0;
+    last_sck_rise = 0;
     mode_register = 0;
     force_bad_mode = 0;
     spi_miso = 0;
