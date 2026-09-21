@@ -120,6 +120,19 @@ module uart_loader_tb #(
       crc_byte = value;
     end
   endfunction
+  task check_response_crc;
+    integer index;
+    reg [15:0] crc;
+    begin
+      crc = 16'hffff;
+      for (index = 2; index < 7 + response_length; index = index + 1)
+        crc = crc_byte(crc, received[index]);
+      check(
+          received[7 + response_length] == crc[7:0] &&
+          received[8 + response_length] == crc[15:8],
+          "response CRC covers every transmitted response byte");
+    end
+  endtask
   task send_frame;
     input [7:0] opcode;
     input [7:0] seq_value;
@@ -148,6 +161,7 @@ module uart_loader_tb #(
       send_byte(crc[7:0] ^ corrupt_crc);
       send_byte(crc[15:8]);
       receive_response();
+      check_response_crc();
     end
   endtask
   task send_frame_version;
@@ -178,6 +192,7 @@ module uart_loader_tb #(
       send_byte(crc[7:0]);
       send_byte(crc[15:8]);
       receive_response();
+      check_response_crc();
     end
   endtask
 

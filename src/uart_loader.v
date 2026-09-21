@@ -35,7 +35,7 @@ module uart_loader #(
   localparam [16:0] MEMORY_BYTES = 17'd65536;
   localparam integer MAX_PAYLOAD_BYTES = 3 + MAX_TRANSFER_BYTES;
   localparam integer MAX_RESPONSE_BYTES =
-      MAX_TRANSFER_BYTES < 6 ? 17 : 11 + MAX_TRANSFER_BYTES;
+      MAX_TRANSFER_BYTES < 9 ? 19 : 11 + MAX_TRANSFER_BYTES;
 
   localparam [7:0] PING = 8'h00;
   localparam [7:0] CAPABILITIES = 8'h01;
