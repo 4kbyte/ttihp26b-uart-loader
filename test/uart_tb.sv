@@ -105,6 +105,13 @@ module uart_tb;
     rst_n = 1;
     repeat (2) tick();
 
+    rx = 0;
+    repeat (3) tick();
+    rx = 1;
+    repeat (12) tick();
+    check(!rx_valid && rx_level == 0 && !framing_error,
+          "UART RX rejects a short false start");
+
     send_uart(8'h41, 1);
     check(rx_valid && rx_data == 8'h41, "UART RX 8N1 byte");
     rx_ready = 1;
