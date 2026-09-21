@@ -1,42 +1,48 @@
-![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
+# TinyTapeout UART SPI RAM Loader
 
-# Tiny Tapeout Verilog Project Template
+A compact TinyTapeout design that loads and inspects a 23LC512-compatible
+SPI SRAM through a CRC-protected UART protocol.
 
-- [Read the documentation for project](docs/info.md)
+## Hardware
 
-## What is Tiny Tapeout?
+- 50 MHz system clock
+- 115200 baud, 8N1 UART
+- 65,536 byte addresses
+- SPI mode 0, at most 12.5 MHz
+- 23LC512 sequential-mode initialization and readback verification
 
-Tiny Tapeout is an educational project that aims to make it easier and cheaper than ever to get your digital and analog designs manufactured on a real chip.
+The loader supports `PING`, `CAPABILITIES`, `WRITE`, `READ`, and `STATUS`.
+The exact wire format and vectors are in [docs/protocol.md](docs/protocol.md).
 
-To learn more and get started, visit https://tinytapeout.com.
+## Host CLI
 
-## Set up your Verilog project
+Install pyserial:
 
-1. Add your Verilog files to the `src` folder.
-2. Edit the [info.yaml](info.yaml) and update information about your project, paying special attention to the `source_files` and `top_module` properties. If you are upgrading an existing Tiny Tapeout project, check out our [online info.yaml migration tool](https://tinytapeout.github.io/tt-yaml-upgrade-tool/).
-3. Edit [docs/info.md](docs/info.md) and add a description of your project.
-4. Adapt the testbench to your design. See [test/README.md](test/README.md) for more information.
+```sh
+python -m pip install -r test/requirements.txt
+```
 
-The GitHub action will automatically build the ASIC files using [LibreLane](https://www.zerotoasiccourse.com/terminology/librelane/).
+Use either a Windows COM port or a Linux tty:
 
-## Enable GitHub actions to build the results page
+```sh
+python tools/uart_loader.py --port COM4 ping
+python tools/uart_loader.py --port /dev/ttyUSB0 status
+python tools/uart_loader.py --port COM4 write 0x100 0x12 0x34
+python tools/uart_loader.py --port COM4 read 0x100 2
+python tools/uart_loader.py --port COM4 load firmware.bin
+python tools/uart_loader.py --port COM4 load firmware.hex --format hex
+python tools/uart_loader.py --port COM4 dump ram.bin --start 0 --count 65536
+python tools/uart_loader.py --port COM4 verify firmware.bin
+```
 
-- [Enabling GitHub Pages](https://tinytapeout.com/faq/#my-github-action-is-failing-on-the-pages-part)
+Binary images map directly to SRAM bytes. Hex images contain whitespace- or
+comma-separated byte values. Writes are chunked to the transfer size reported
+by the hardware, retried with a fixed bound, repaired after partial memory
+faults, and verified by default.
 
-## Resources
+## Verification
 
-- [FAQ](https://tinytapeout.com/faq/)
-- [Digital design lessons](https://tinytapeout.com/digital_design/)
-- [Learn how semiconductors work](https://tinytapeout.com/siliwiz/)
-- [Join the community](https://tinytapeout.com/discord)
-- [Build your design locally](https://www.tinytapeout.com/guides/local-hardening/)
-
-## What next?
-
-- [Submit your design to the next shuttle](https://app.tinytapeout.com/).
-- Edit [this README](README.md) and explain your design, how it works, and how to test it.
-- Share your project on your social network of choice:
-  - LinkedIn [#tinytapeout](https://www.linkedin.com/search/results/content/?keywords=%23tinytapeout) [@TinyTapeout](https://www.linkedin.com/company/100708654/)
-  - Mastodon [#tinytapeout](https://chaos.social/tags/tinytapeout) [@matthewvenn](https://chaos.social/@matthewvenn)
-  - X (formerly Twitter) [#tinytapeout](https://twitter.com/hashtag/tinytapeout) [@tinytapeout](https://twitter.com/tinytapeout)
-  - Bluesky [@tinytapeout.com](https://bsky.app/profile/tinytapeout.com)
+```sh
+cd test
+make
+```

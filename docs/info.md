@@ -1,20 +1,15 @@
-<!---
-
-This file is used to generate your project datasheet. Please fill in the information below and delete any unused
-sections.
-
-You can also include images in this folder and reference them in the markdown. Each image must be less than
-512 kb in size, and the combined size of all images must be less than 1 MB.
--->
-
 ## How it works
 
-Explain how your project works
+The design receives bounded CRC-protected commands over a 115200 8N1 UART.
+It initializes a 23LC512-compatible SRAM into sequential mode, verifies the
+mode register, and exposes all 65,536 byte addresses. The maximum READ and
+WRITE transfer size is an RTL parameter reported by the CAPABILITIES command.
 
 ## How to test
 
-Explain how to use your project
+Run `make` in `test`. See [protocol.md](protocol.md) for the wire contract.
 
 ## External hardware
 
-List external hardware used in your project (e.g. PMOD, LED display, etc), if any
+Connect a 23LC512-compatible 64 KiB SPI SRAM and a UART adapter. UART RX is
+`ui[3]`, UART TX is `uo[4]`, and SPI uses `uio[0:3]`.
