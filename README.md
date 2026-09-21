@@ -8,7 +8,7 @@ SPI SRAM through a CRC-protected UART protocol.
 - 50 MHz system clock
 - 115200 baud, 8N1 UART
 - 65,536 byte addresses
-- SPI mode 0, at most 12.5 MHz
+- SPI mode 0 at 6.25 MHz
 - 23LC512 sequential-mode initialization and readback verification
 
 The loader supports `PING`, `CAPABILITIES`, `WRITE`, `READ`, and `STATUS`.
@@ -16,10 +16,13 @@ The exact wire format and vectors are in [docs/protocol.md](docs/protocol.md).
 
 ## Host CLI
 
+Run these commands from the repository root. The host CLI is
+`tools/uart_loader.py`.
+
 Install pyserial:
 
 ```sh
-python -m pip install -r test/requirements.txt
+python -m pip install pyserial==3.5
 ```
 
 Use either a Windows COM port or a Linux tty:
